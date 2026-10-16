@@ -1,0 +1,4 @@
+/* App-level overrides go here; base styles live in theme.css. */
+#root {
+  min-height: 100%;
+}
