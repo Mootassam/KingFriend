@@ -8,6 +8,10 @@ const publicRoutes = [
     path: "/login",
     loader: () => import("src/view/pages/Auth/SigninPage"),
   },
+  {
+    path: "/register",
+    loader: () => import("src/view/pages/Auth/SignupPage"),
+  },
 ];
 
 // Workspace pages rendered inside LayoutPage (topbar + sidebar).

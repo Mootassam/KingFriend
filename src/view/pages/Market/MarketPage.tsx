@@ -1,4 +1,4 @@
-import { Bitcoin, ChartNoAxesColumn, Globe, Layers, SearchX } from "lucide-react";
+import { Bitcoin, ChartNoAxesColumn, Globe, Layers, Moon, SearchX } from "lucide-react";
 import { useState } from "react";
 import { useSelector } from "react-redux";
 import { Link } from "react-router-dom";
@@ -14,8 +14,8 @@ import SwitchTab from "src/view/shared/SwitchTab";
 const tabIcons = {
   Forex: <Globe size={14} />,
   Crypto: <Bitcoin size={14} />,
-  Stocks: <ChartNoAxesColumn size={14} />,
   Commodities: <Layers size={14} />,
+  Indices: <ChartNoAxesColumn size={14} />,
 };
 
 export default function MarketPage() {
@@ -36,7 +36,7 @@ export default function MarketPage() {
       </div>
       <div className="page-padding">
         {categories.slice(1).map((group) => {
-          const rows = visible.filter((q) => q.category === group);
+          const rows = visible.filter((quote) => quote.category === group);
           if (!rows.length) return null;
           return (
             <section key={group} className="market-section">
@@ -50,21 +50,29 @@ export default function MarketPage() {
                   <span>SYMBOL</span>
                   <span>PRICE &nbsp; 24H</span>
                 </div>
-                {rows.map((quote) => (
-                  <div key={quote.symbol} className="quote-row">
-                    <div>
-                      <b>{quote.symbol}</b>
-                      <small>{quote.name}</small>
+                {rows.map((quote) => {
+                  const closed = quote.open === false;
+                  return (
+                    <div key={quote.symbol} className={"quote-row" + (closed ? " is-closed" : "")}>
+                      <div>
+                        <b>
+                          {quote.symbol}
+                          {closed && (
+                            <span className="market-closed" title="Market closed. Showing the last price until it reopens.">
+                              <Moon size={11} aria-hidden="true" /> Closed
+                            </span>
+                          )}
+                        </b>
+                        <small>{quote.name}</small>
+                      </div>
+                      <strong className="numeric quote-price">{quote.ready ? <AnimatedPrice quote={quote} /> : "—"}</strong>
+                      {quote.ready ? <Change value={quote.change} /> : <span className="numeric">—</span>}
+                      <Link className="primary small" to={"/app/trade?symbol=" + quote.symbol}>
+                        Trade
+                      </Link>
                     </div>
-                    <strong className="numeric quote-price">
-                      <AnimatedPrice quote={quote} />
-                    </strong>
-                    <Change value={quote.change} />
-                    <Link className="primary small" to={"/app/trade?symbol=" + quote.symbol}>
-                      Trade
-                    </Link>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           );

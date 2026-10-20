@@ -42,12 +42,10 @@ export default function MarketWatch() {
           >
             <span>
               <b>{quote.symbol}</b>
-              <small>{quote.category.toUpperCase()}</small>
+              <small>{quote.open === false ? "CLOSED" : quote.category.toUpperCase()}</small>
             </span>
-            <span className="numeric">
-              <AnimatedPrice quote={quote} />
-            </span>
-            <Change value={quote.change} />
+            <span className="numeric">{quote.ready ? <AnimatedPrice quote={quote} value={quote.bid > 0 ? quote.bid : quote.price} /> : "—"}</span>
+            {quote.ready ? <Change value={quote.change} /> : <span className="numeric">—</span>}
           </button>
         ))}
         {!rows.length && <EmptyState icon={<SearchX />} heading="No results" />}

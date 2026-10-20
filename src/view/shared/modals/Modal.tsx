@@ -1,5 +1,7 @@
 import { X } from "lucide-react";
 import { ReactNode, useEffect, useId, useRef } from "react";
+import { useSelector } from "react-redux";
+import authSelectors from "src/modules/auth/authSelectors";
 import DemoBadge from "src/view/shared/DemoBadge";
 
 interface Props {
@@ -11,6 +13,7 @@ interface Props {
 export default function Modal({ title, children, onClose }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const isDemo = useSelector(authSelectors.selectIsDemo);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -31,7 +34,7 @@ export default function Modal({ title, children, onClose }: Props) {
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="modal-top">
-        <DemoBadge />
+        {isDemo ? <DemoBadge /> : <span />}
         <button className="icon-btn" onClick={onClose} aria-label="Close dialog">
           <X />
         </button>

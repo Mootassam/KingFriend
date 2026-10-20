@@ -1,8 +1,9 @@
 // Browser storage can throw (private mode, blocked site data), so every access is guarded.
 export const storageKeys = {
   demo: "nexora-demo",
-  session: "nexora-session",
-  demoReady: "kingfriend-demo-ready",
+  jwt: "jwt",
+  tenant: "tenant",
+  welcome: "kingfriend-welcome",
   theme: "kingfriend-theme",
 };
 

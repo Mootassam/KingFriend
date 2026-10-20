@@ -1,7 +1,9 @@
 import { Activity, ChartNoAxesColumn, Wallet, Zap } from "lucide-react";
 import { useSelector } from "react-redux";
 import { Link } from "react-router-dom";
-import { demoAccount } from "src/modules/demo/demoEnumerators";
+import accountSelectors from "src/modules/account/accountSelectors";
+import assetsSelectors from "src/modules/assets/assetsSelectors";
+import authSelectors from "src/modules/auth/authSelectors";
 import demoSelectors, { useDemoStats } from "src/modules/demo/demoSelectors";
 import { money } from "src/shared/Amount";
 import AccountActions from "src/view/shared/AccountActions";
@@ -10,12 +12,21 @@ import MoversPanel from "src/view/pages/Home/MoversPanel";
 const greeting = (hour: number) => (hour < 12 ? "Morning" : hour < 17 ? "Afternoon" : "Evening");
 
 export default function HomePage() {
-  const name = useSelector(demoSelectors.selectName);
-  const balance = useSelector(demoSelectors.selectBalance);
+  const name = useSelector(authSelectors.selectDisplayName);
+  const user = useSelector(authSelectors.selectCurrentUser);
+  const isDemo = useSelector(authSelectors.selectIsDemo);
+  const balance = useSelector(accountSelectors.selectBalance);
+  const balanceLoaded = useSelector(accountSelectors.selectBalanceLoaded);
+  const balanceError = useSelector(assetsSelectors.selectErrorMessage);
   const quotes = useSelector(demoSelectors.selectQuotes);
   const stats = useDemoStats();
   const now = new Date();
-  const sorted = [...quotes].sort((a, b) => b.change - a.change);
+  // Movers only from instruments the live feed has priced.
+  const sorted = quotes.filter((q) => q.ready).sort((a, b) => b.change - a.change);
+  // The balance can be zero on a real account, which would turn the percentage into NaN.
+  const todayPercent = balance > 0 ? (stats.today / balance) * 100 : 0;
+  // Shown as "—" until the server's wallets arrive, so a stale number is never displayed.
+  const balanceLabel = balanceLoaded ? money(balance) : balanceError ? "—" : "Loading…";
 
   return (
     <div className="home-page">
@@ -26,14 +37,16 @@ export default function HomePage() {
           </h1>
           <p>
             {now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}{" "}
-            <span className="demo-badge">DEMO ACCOUNT</span>
+            {isDemo && <span className="demo-badge">DEMO ACCOUNT</span>}
           </p>
-          <span className="uid">
-            UID <b className="numeric">{demoAccount.uid}</b>
-          </span>
+          {user?.uid && (
+            <span className="uid">
+              UID <b className="numeric">{user.uid}</b>
+            </span>
+          )}
         </div>
         <Link to="/app/profile" className="avatar">
-          {name.charAt(0)}
+          {name.charAt(0).toUpperCase()}
         </Link>
       </div>
 
@@ -41,23 +54,28 @@ export default function HomePage() {
         <div className="eyebrow">
           <Wallet size={18} /> ACCOUNT BALANCE
         </div>
-        <div className="big-balance numeric">{money(balance)}</div>
+        <div className="big-balance numeric">{balanceLabel}</div>
+        {!isDemo && balanceError && (
+          <p className="negative" role="alert">
+            Couldn&apos;t load your balance: {balanceError}
+          </p>
+        )}
         <div className={"pnl-strip " + (stats.today >= 0 ? "profit" : "loss")}>
           <span>
             <Activity size={18} /> TODAY’S P&amp;L
           </span>
           <b className="numeric">
-            {money(stats.today)} ({((stats.today / balance) * 100).toFixed(2)}%)
+            {money(stats.today)} ({todayPercent.toFixed(2)}%)
           </b>
         </div>
         <div className="metrics">
           <div>
             <small>TOTAL EQUITY</small>
-            <b className="numeric">{money(stats.equity)}</b>
+            <b className="numeric">{balanceLoaded ? money(stats.equity) : "—"}</b>
           </div>
           <div>
             <small>AVAILABLE MARGIN</small>
-            <b className="numeric positive">{money(stats.available)}</b>
+            <b className="numeric positive">{balanceLoaded ? money(stats.available) : "—"}</b>
           </div>
           <div>
             <small>MARGIN USED</small>

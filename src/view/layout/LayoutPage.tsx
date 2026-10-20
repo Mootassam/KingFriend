@@ -11,7 +11,6 @@ import {
   Newspaper,
   RefreshCw,
   Sun,
-  Users,
   Wallet,
   X,
 } from "lucide-react";
@@ -19,17 +18,22 @@ import { ReactNode, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link, useLocation } from "react-router-dom";
 import { i18n } from "src/i18n";
+import accountSelectors from "src/modules/account/accountSelectors";
+import assetsActions from "src/modules/assets/assetsActions";
 import authActions from "src/modules/auth/authActions";
-import AuthService from "src/modules/auth/authService";
-import demoActions from "src/modules/demo/demoActions";
+import authSelectors from "src/modules/auth/authSelectors";
+import AuthService, { WelcomeKind } from "src/modules/auth/authService";
 import demoSelectors from "src/modules/demo/demoSelectors";
 import layoutActions from "src/modules/layout/layoutActions";
 import layoutSelectors from "src/modules/layout/layoutSelectors";
 import type { AppDispatch } from "src/modules/store";
 import { useTheme } from "src/modules/theme/themeContext";
+import { refreshLiveQuotes } from "src/modules/market/liveQuotesService";
+import { getSocket } from "src/modules/shared/socket/socketClient";
 import { startMarketTicker } from "src/services/marketService";
 import { money } from "src/shared/Amount";
 import AnimatedPrice from "src/view/shared/AnimatedPrice";
+import ChatWidget from "src/view/shared/chat/ChatWidget";
 import Change from "src/view/shared/Change";
 import DemoBadge from "src/view/shared/DemoBadge";
 import Logo from "src/view/shared/Logo";
@@ -41,7 +45,6 @@ const navigation = [
   { label: "menu.trade", path: "/app/trade", icon: ArrowLeftRight },
   { label: "menu.orders", path: "/app/orders", icon: ListOrdered },
   { label: "menu.news", path: "/app/news", icon: Newspaper },
-  { label: "menu.copy", path: "/app/copy", icon: Users },
   { label: "menu.profile", path: "/app/profile", icon: Wallet },
   { label: "menu.service", path: "/app/service", icon: Headphones },
 ];
@@ -52,17 +55,38 @@ export default function LayoutPage({ children }: { children: ReactNode }) {
   const { light, toggle } = useTheme();
   const menuVisible = useSelector(layoutSelectors.selectMenuVisible);
   const lastUpdated = useSelector(layoutSelectors.selectLastUpdated);
-  const balance = useSelector(demoSelectors.selectBalance);
+  const balance = useSelector(accountSelectors.selectBalance);
+  const balanceLoaded = useSelector(accountSelectors.selectBalanceLoaded);
+  const isDemo = useSelector(authSelectors.selectIsDemo);
+  const displayName = useSelector(authSelectors.selectDisplayName);
+  const userId = useSelector(authSelectors.selectCurrentUser)?.id;
   const btc = useSelector(demoSelectors.selectQuote("BTCUSD"));
-  const [notice, setNotice] = useState(false);
+  const [notice, setNotice] = useState<WelcomeKind | null>(null);
   const [entering, setEntering] = useState(false);
   const [exiting, setExiting] = useState(false);
 
   useEffect(() => startMarketTicker(dispatch), [dispatch]);
 
   useEffect(() => {
-    if (!AuthService.consumeDemoReady()) return;
-    setNotice(true);
+    dispatch(assetsActions.doFetch());
+  }, [dispatch]);
+
+  // Deposits (including ones an admin adds), withdrawals and rewards each push a
+  // notification, so reload the balance then instead of waiting for a page refresh.
+  useEffect(() => {
+    if (!userId) return;
+    const socket = getSocket(userId, false);
+    const reload = () => dispatch(assetsActions.doFetch());
+    socket?.on("newNotification", reload);
+    return () => {
+      socket?.off("newNotification", reload);
+    };
+  }, [userId, dispatch]);
+
+  useEffect(() => {
+    const welcome = AuthService.consumeWelcome();
+    if (!welcome) return;
+    setNotice(welcome);
     setEntering(true);
   }, []);
 
@@ -74,7 +98,7 @@ export default function LayoutPage({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!notice) return;
-    const timer = setTimeout(() => setNotice(false), 5500);
+    const timer = setTimeout(() => setNotice(null), 5500);
     return () => clearTimeout(timer);
   }, [notice]);
 
@@ -97,8 +121,14 @@ export default function LayoutPage({ children }: { children: ReactNode }) {
       {notice && (
         <div className="demo-ready-notice" role="status">
           <CircleCheck size={21} aria-hidden="true" />
-          <span>Demo account ready — $10,000 starting virtual funds!</span>
-          <button type="button" aria-label="Dismiss demo confirmation" onClick={() => setNotice(false)}>
+          <span>
+            {isDemo
+              ? "Demo account ready — virtual funds loaded!"
+              : notice === "signup"
+                ? `Welcome to KingFriend, ${displayName}! Your account is ready.`
+                : `Welcome back, ${displayName}!`}
+          </span>
+          <button type="button" aria-label="Dismiss welcome message" onClick={() => setNotice(null)}>
             <X size={13} />
           </button>
         </div>
@@ -117,22 +147,20 @@ export default function LayoutPage({ children }: { children: ReactNode }) {
         <Link to="/app" className="brand-link">
           <Logo />
         </Link>
-        <DemoBadge />
+        {isDemo && <DemoBadge />}
         <div className="ticker">
           <b>BTCUSD</b>
-          <b className="numeric">
-            <AnimatedPrice quote={btc} />
-          </b>
-          <Change value={btc.change} />
+          <b className="numeric">{btc.ready ? <AnimatedPrice quote={btc} /> : "—"}</b>
+          {btc.ready && <Change value={btc.change} />}
           <span className="updated">Updated: {lastUpdated}</span>
-          <button className="small-btn" onClick={() => dispatch(demoActions.doTick())}>
+          <button className="small-btn" onClick={refreshLiveQuotes}>
             <RefreshCw size={13} /> Refresh
           </button>
         </div>
         <div className="header-actions">
           <Link to="/app/profile" className="wallet">
             <Wallet size={16} />
-            <b className="numeric">{money(balance)}</b>
+            <b className="numeric">{balanceLoaded ? money(balance) : "—"}</b>
           </Link>
           <button
             className="icon-btn amber"
@@ -190,6 +218,7 @@ export default function LayoutPage({ children }: { children: ReactNode }) {
       </aside>
 
       <main className="main-view">{children}</main>
+      <ChatWidget />
     </div>
   );
 }

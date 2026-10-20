@@ -8,8 +8,11 @@ import {
   UTCTimestamp,
   createChart,
 } from "lightweight-charts";
-import { useEffect, useRef } from "react";
-import { Quote, Timeframe, quotes, timeframeSeconds } from "src/modules/demo/demoEnumerators";
+import { useEffect, useRef, useState } from "react";
+import { Quote, Timeframe, timeframeResolution, timeframeSeconds } from "src/modules/demo/demoEnumerators";
+import { FeedCandle, subscribeCandles } from "src/modules/market/chartFeedService";
+import { buildInjectionSeries } from "src/modules/market/injectionSeries";
+import type { SymbolInjection } from "src/modules/tradeOrders/tradeOrdersService";
 import { useTheme } from "src/modules/theme/themeContext";
 
 export interface Candle {
@@ -24,39 +27,6 @@ const UP = "#21a66b";
 const DOWN = "#ea393f";
 const VOLUME_UP = "#174835";
 const VOLUME_DOWN = "#51272e";
-
-// Deterministic 100-candle history ending at the seed price, shifted to the current quote.
-export function generateCandles(symbol: string, timeframe: Timeframe, current: number): Candle[] {
-  const seed = quotes.find((q) => q.symbol === symbol)!.price;
-  const seconds = timeframeSeconds[timeframe];
-  const end = Math.floor(Date.now() / 1000 / seconds) * seconds;
-  const volatility = 65e-5 * Math.sqrt(seconds / 60);
-  const candles: Candle[] = [];
-  let last = 0.994 * seed;
-
-  for (let i = 0; i < 100; i++) {
-    const open = last;
-    const close =
-      open + seed * (0.7 * Math.sin(1.8 * i + symbol.length) + 0.65 * Math.cos(0.19 * i) + 0.05) * volatility;
-    candles.push({
-      time: (end - (99 - i) * seconds) as UTCTimestamp,
-      open,
-      close,
-      high: Math.max(open, close) + seed * volatility * (0.25 + Math.abs(Math.sin(2.13 * i))),
-      low: Math.min(open, close) - seed * volatility * (0.2 + Math.abs(Math.cos(1.47 * i))),
-    });
-    last = close;
-  }
-
-  const shift = current - candles[99].close;
-  return candles.map((c) => ({
-    ...c,
-    open: c.open + shift,
-    high: c.high + shift,
-    low: c.low + shift,
-    close: c.close + shift,
-  }));
-}
 
 const palette = (light: boolean) => ({
   layout: {
@@ -76,20 +46,42 @@ interface Props {
   quote: Quote;
   timeframe: Timeframe;
   onOhlc: (candle: Candle) => void;
+  // Admin price injection for this symbol: while it runs the chart draws PC's deterministic
+  // injection candles instead of the feed, then returns to live candles when it ends.
+  injection?: SymbolInjection | null;
 }
 
-export default function CandleChart({ quote, timeframe, onOhlc }: Props) {
+const INJECTION_TICK_MS = 1000;
+
+const toCandle = (c: FeedCandle): Candle => ({
+  time: c.time as UTCTimestamp,
+  open: c.open,
+  high: c.high,
+  low: c.low,
+  close: c.close,
+});
+
+const toVolume = (c: FeedCandle) => ({
+  time: c.time as UTCTimestamp,
+  value: c.volume,
+  color: c.close >= c.open ? VOLUME_UP : VOLUME_DOWN,
+});
+
+// Real market candles from the live feed: history first, then the latest bar updates live.
+export default function CandleChart({ quote, timeframe, onOhlc, injection }: Props) {
   const { light } = useTheme();
   const container = useRef<HTMLDivElement>(null);
   const chart = useRef<IChartApi | null>(null);
-  const candles = useRef<ISeriesApi<"Candlestick"> | null>(null);
-  const volume = useRef<ISeriesApi<"Histogram"> | null>(null);
-  const lastCandle = useRef<Candle | null>(null);
-  const shown = useRef<number | null>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [error, setError] = useState("");
+  const active = injection && injection.symbol === quote.symbol ? injection : null;
+  const injectionRef = useRef(active);
+  injectionRef.current = active;
 
   // Rebuild the chart whenever the instrument or timeframe changes.
   useEffect(() => {
     if (!container.current) return;
+    setStatus("loading");
     const api = createChart(container.current, {
       autoSize: true,
       layout: {
@@ -97,7 +89,7 @@ export default function CandleChart({ quote, timeframe, onOhlc }: Props) {
         textColor: "#7e879a",
         fontFamily: "Courier New",
         fontSize: 12,
-        attributionLogo: true,
+        attributionLogo: false,
         panes: { separatorColor: "#263044", separatorHoverColor: "#344058" },
       },
       grid: { vertLines: { color: "#212a3a" }, horzLines: { color: "#212a3a" } },
@@ -121,10 +113,7 @@ export default function CandleChart({ quote, timeframe, onOhlc }: Props) {
       priceLineColor: "#eeb900",
       priceLineStyle: LineStyle.Dashed,
     });
-    const data = generateCandles(quote.symbol, timeframe, quote.price);
-    series.setData(data);
-
-    const bars = api.addSeries(
+    const bars: ISeriesApi<"Histogram"> = api.addSeries(
       HistogramSeries,
       { priceFormat: { type: "volume" }, priceScaleId: "volume", lastValueVisible: false, priceLineVisible: false },
       1,
@@ -132,74 +121,76 @@ export default function CandleChart({ quote, timeframe, onOhlc }: Props) {
     bars.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0 }, visible: false });
     api.panes()[0].setStretchFactor(0.93);
     api.panes()[1].setStretchFactor(0.07);
-    bars.setData(
-      data.map((c, i) => ({
-        time: c.time,
-        value: 20 + 200 * Math.abs(Math.sin(8.72 * i)),
-        color: c.close >= c.open ? VOLUME_UP : VOLUME_DOWN,
-      })),
-    );
-    api.timeScale().setVisibleLogicalRange({ from: 40, to: 101 });
-
     chart.current = api;
-    candles.current = series;
-    volume.current = bars;
-    lastCandle.current = data[data.length - 1];
-    shown.current = null;
+
+    const running = injectionRef.current;
+    if (running) {
+      const bucket = timeframeSeconds[timeframe];
+      const draw = () => {
+        const candles = buildInjectionSeries(running, bucket, Date.now()).map((c) => ({
+          ...c,
+          time: c.time as UTCTimestamp,
+        }));
+        series.setData(candles);
+        onOhlc(candles[candles.length - 1]);
+      };
+      bars.setData([]);
+      draw();
+      api.timeScale().scrollToPosition(5, false);
+      setStatus("ready");
+      const tick = setInterval(draw, INJECTION_TICK_MS);
+      return () => {
+        clearInterval(tick);
+        chart.current = null;
+        api.remove();
+      };
+    }
+
+    let last: FeedCandle | null = null;
+    const stop = subscribeCandles(quote.symbol, timeframeResolution[timeframe], {
+      onHistory: (candles) => {
+        series.setData(candles.map(toCandle));
+        bars.setData(candles.map(toVolume));
+        api.timeScale().setVisibleLogicalRange({ from: candles.length - 60, to: candles.length + 1 });
+        last = candles[candles.length - 1];
+        onOhlc(toCandle(last));
+        setStatus("ready");
+      },
+      onUpdate: (candle) => {
+        // Ignore late updates for bars older than the one already shown.
+        if (last && candle.time < last.time) return;
+        series.update(toCandle(candle));
+        bars.update(toVolume(candle));
+        last = candle;
+        onOhlc(toCandle(candle));
+      },
+      onError: (message) => {
+        setError(message);
+        setStatus("error");
+      },
+    });
 
     return () => {
+      stop();
       chart.current = null;
-      candles.current = null;
-      volume.current = null;
       api.remove();
     };
-    // The live price is applied by the effect below; rebuilding on every tick would reset zoom.
-  }, [quote.symbol, quote.precision, timeframe]);
+    // onOhlc is a state setter from the parent and never changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quote.symbol, quote.precision, timeframe, active?.startedAt, active?.targetPrice, active?.durationMs]);
 
   useEffect(() => {
     chart.current?.applyOptions(palette(light));
   }, [light, quote.symbol, timeframe]);
 
-  // Feed each tick into the latest candle, easing the close toward the new price.
-  useEffect(() => {
-    if (!candles.current || !lastCandle.current) return;
-    const seconds = timeframeSeconds[timeframe];
-    const bucket = Math.floor(Date.now() / 1000 / seconds) * seconds;
-    let current = lastCandle.current;
-    if (bucket > current.time) {
-      current = { time: bucket as UTCTimestamp, open: current.close, high: current.close, low: current.close, close: current.close };
-    }
-    const target: Candle = {
-      ...current,
-      close: quote.price,
-      high: Math.max(current.high, quote.price),
-      low: Math.min(current.low, quote.price),
-    };
-    lastCandle.current = target;
-    onOhlc(target);
-
-    const from = shown.current ?? quote.price;
-    const start = performance.now();
-    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let frame = 0;
-    const step = (now: number) => {
-      const t = reduced ? 1 : Math.min(1, (now - start) / 400);
-      const close = from + (target.close - from) * (1 - Math.pow(1 - t, 3));
-      shown.current = close;
-      candles.current?.update({ ...target, close, high: Math.max(target.high, close), low: Math.min(target.low, close) });
-      if (t < 1) frame = requestAnimationFrame(step);
-    };
-    frame = requestAnimationFrame(step);
-
-    volume.current?.update({
-      time: target.time,
-      value: 20 + 2e5 * Math.abs((target.close - target.open) / quote.price),
-      color: target.close >= target.open ? VOLUME_UP : VOLUME_DOWN,
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [quote.price, quote.symbol, timeframe, onOhlc]);
-
   return (
-    <div ref={container} className="candle-chart" aria-label={`Interactive simulated ${quote.symbol} candlestick chart`} />
+    <div className="candle-chart-wrap">
+      <div ref={container} className="candle-chart" aria-label={`Live ${quote.symbol} candlestick chart`} />
+      {status !== "ready" && (
+        <div className="chart-status" role="status">
+          {status === "loading" ? "Loading live chart…" : error}
+        </div>
+      )}
+    </div>
   );
 }

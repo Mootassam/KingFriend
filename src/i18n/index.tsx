@@ -9,6 +9,10 @@ export async function init(language: Language = "en") {
   current = language;
 }
 
+export function getLanguageCode(): string {
+  return current;
+}
+
 // Resolves a dotted key such as "menu.home"; returns the key itself when missing.
 export function i18n(key: string): string {
   const value = key

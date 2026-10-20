@@ -1,5 +1,5 @@
 import { DemoState } from "src/modules/demo/demoEnumerators";
-import { OrderRequest, createOrder } from "src/modules/demo/demoEngine";
+import { LiveUpdate, OrderRequest, createOrder } from "src/modules/demo/demoEngine";
 import layoutActions from "src/modules/layout/layoutActions";
 import type { AppThunk } from "src/modules/store";
 
@@ -7,20 +7,22 @@ const prefix = "DEMO";
 
 const demoActions = {
   HYDRATE: `${prefix}_HYDRATE`,
-  TICK: `${prefix}_TICK`,
+  LIVE_QUOTES: `${prefix}_LIVE_QUOTES`,
   SELECT_SYMBOL: `${prefix}_SELECT_SYMBOL`,
   REPLACE: `${prefix}_REPLACE`,
   CLOSE_POSITION: `${prefix}_CLOSE_POSITION`,
   CANCEL_PENDING: `${prefix}_CANCEL_PENDING`,
-  RENAME: `${prefix}_RENAME`,
+  BALANCE_SYNCED: `${prefix}_BALANCE_SYNCED`,
   RESET: `${prefix}_RESET`,
 
   doHydrate: (state: DemoState) => ({ type: demoActions.HYDRATE, payload: state }),
 
-  doTick: (): AppThunk => (dispatch) => {
-    dispatch({ type: demoActions.TICK });
-    dispatch(layoutActions.doMarkUpdated());
-  },
+  doLiveQuotes:
+    (updates: Record<string, LiveUpdate>): AppThunk =>
+    (dispatch) => {
+      dispatch({ type: demoActions.LIVE_QUOTES, payload: updates });
+      dispatch(layoutActions.doMarkUpdated());
+    },
 
   doSelectSymbol: (symbol: string) => ({ type: demoActions.SELECT_SYMBOL, payload: symbol }),
 
@@ -34,7 +36,11 @@ const demoActions = {
 
   doClosePosition: (id: string) => ({ type: demoActions.CLOSE_POSITION, payload: id }),
   doCancelPending: (id: string) => ({ type: demoActions.CANCEL_PENDING, payload: id }),
-  doRename: (name: string) => ({ type: demoActions.RENAME, payload: name.trim().slice(0, 50) }),
+
+  // Real accounts spend the balance the server holds, so the account balance is replaced by
+  // the wallets the server returned. Demo accounts keep their virtual funds.
+  doSyncBalance: (balance: number) => ({ type: demoActions.BALANCE_SYNCED, payload: balance }),
+
   doReset: () => ({ type: demoActions.RESET }),
 };
 
