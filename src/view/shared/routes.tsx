@@ -48,6 +48,22 @@ const navRoutes = [
     path: "/app/service",
     loader: () => import("src/view/pages/Support/SupportPage"),
   },
+  {
+    path: "/app/service/faq",
+    loader: () => import("src/view/pages/Support/FaqPage"),
+  },
+  {
+    path: "/app/service/faq/:id",
+    loader: () => import("src/view/pages/Support/FaqDetailPage"),
+  },
+  {
+    path: "/app/service/guide",
+    loader: () => import("src/view/pages/Support/GuidePage"),
+  },
+  {
+    path: "/app/service/guide/:id",
+    loader: () => import("src/view/pages/Support/GuideDetailPage"),
+  },
 ];
 
 export default {

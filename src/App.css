@@ -751,6 +751,15 @@
   overflow: visible;
 }
 
+/* Same fix for the Market Price / Pending Orders bar, now the first thing in the ticket:
+   let it fit its buttons (no scrollbar), space the two buttons apart and clear the top edge. */
+.terminal .ticket-tabs {
+  height: auto;
+  overflow: visible;
+  gap: 10px;
+  margin-top: 14px;
+}
+
 /* Keep the live chat button clear of the Buy/Sell buttons on the Trade page. */
 .kc-chat-root.raised {
   bottom: 96px;
@@ -763,4 +772,63 @@
 .kc-chat-root.compact .kc-chat-launcher svg {
   width: 21px;
   height: 21px;
+}
+
+/* Help Center (FAQ) pages: question list and answer, in the workspace theme. */
+.faq-back {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  margin-right: 4px;
+}
+.faq-back:hover {
+  color: var(--text);
+}
+.faq-list {
+  display: flex;
+  flex-direction: column;
+}
+.faq-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  color: var(--text);
+  border-bottom: 1px solid var(--border-soft);
+  transition: background 0.15s;
+}
+.faq-row:last-child {
+  border-bottom: 0;
+}
+.faq-row:hover {
+  background: var(--bg-panel-soft);
+}
+.faq-row svg {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.faq-answer {
+  padding: 26px 24px;
+}
+.faq-answer h2 {
+  font-size: 18px;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.faq-answer p {
+  color: var(--muted);
+  line-height: 1.7;
+  white-space: pre-line;
+}
+.faq-next {
+  margin-top: 14px;
+  border-bottom: 1px solid var(--glass-2-border);
+}
+.faq-next small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 3px;
 }

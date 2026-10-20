@@ -21,7 +21,7 @@ export default function TradePage() {
   const dispatch = useDispatch();
   const symbol = new URLSearchParams(useLocation().search).get("symbol");
   const quote = useSelector(demoSelectors.selectSelectedQuote);
-  const [timeframe, setTimeframe] = useState<Timeframe>("M1");
+  const [timeframe, setTimeframe] = useState<Timeframe>("D1");
   const [mobileTab, setMobileTab] = useState<(typeof mobileTabs)[number]>("Chart");
   const [ohlc, setOhlc] = useState<Candle | null>(null);
   // Server-driven chart injections (same for every visitor, as on PC's futures page).

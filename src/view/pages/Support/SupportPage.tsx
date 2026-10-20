@@ -1,27 +1,25 @@
 import { BookOpen, ChevronRight, CircleHelp, Headphones, MessageCircle } from "lucide-react";
-import { useState } from "react";
+import { useHistory } from "react-router-dom";
 import chatWidgetBus from "src/view/shared/chat/chatWidgetBus";
-import Modal from "src/view/shared/modals/Modal";
 
+// Each help topic opens its own Help Center section.
 const topics = [
   {
     title: "FAQ",
     icon: CircleHelp,
     description: "Answers to common account questions.",
-    content:
-      "Demo accounts use virtual funds only. Real accounts show the balance and wallets held on our servers in Profile. For deposits, withdrawals, identity verification or anything else about your account, start a live chat with our support team.",
+    href: "/app/service/faq",
   },
   {
     title: "Trading Guide",
     icon: BookOpen,
     description: "Get familiar with your trading workspace.",
-    content:
-      "Choose an instrument in Markets or Market Watch. Select a timeframe, set your lot size and multiplier, then choose Buy or Sell. Confirm the order. Manage positions in Orders; Close realizes the P&L and releases margin. Pending orders execute when the quote reaches your limit.",
+    href: "/app/service/guide",
   },
 ];
 
 export default function SupportPage() {
-  const [open, setOpen] = useState<number | null>(null);
+  const history = useHistory();
 
   return (
     <div>
@@ -44,8 +42,12 @@ export default function SupportPage() {
             <p>Talk to our support team in real time.</p>
             <ChevronRight size={19} />
           </button>
-          {topics.map((topic, index) => (
-            <button key={topic.title} className="panel help-card" onClick={() => setOpen(index)}>
+          {topics.map((topic) => (
+            <button
+              key={topic.title}
+              className="panel help-card"
+              onClick={() => history.push(topic.href)}
+            >
               <topic.icon className="blue" size={29} />
               <h3>{topic.title}</h3>
               <p>{topic.description}</p>
@@ -54,14 +56,6 @@ export default function SupportPage() {
           ))}
         </div>
       </div>
-      {open !== null && (
-        <Modal title={topics[open].title} onClose={() => setOpen(null)}>
-          <p>{topics[open].content}</p>
-          <button className="primary" onClick={() => setOpen(null)}>
-            Got it
-          </button>
-        </Modal>
-      )}
     </div>
   );
 }

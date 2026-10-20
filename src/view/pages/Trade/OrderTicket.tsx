@@ -18,11 +18,9 @@ import TradeOrdersService, {
   multipliers,
 } from "src/modules/tradeOrders/tradeOrdersService";
 import { money } from "src/shared/Amount";
-import EmptyState from "src/view/shared/EmptyState";
 import SwitchTab from "src/view/shared/SwitchTab";
 import Modal from "src/view/shared/modals/Modal";
 
-const productTabs = ["Spot", "Futures"] as const;
 const ticketTabs = ["Market Price", "Pending Orders"] as const;
 
 export default function OrderTicket({ quote }: { quote: Quote }) {
@@ -41,7 +39,6 @@ export default function OrderTicket({ quote }: { quote: Quote }) {
   const [placing, setPlacing] = useState(false);
   const noticeTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(noticeTimer.current), []);
-  const [product, setProduct] = useState<(typeof productTabs)[number]>("Spot");
   const [ticket, setTicket] = useState<(typeof ticketTabs)[number]>("Market Price");
   const [lotsInput, setLotsInput] = useState("0.01");
   const [leverage, setLeverage] = useState(100);
@@ -135,200 +132,191 @@ export default function OrderTicket({ quote }: { quote: Quote }) {
 
   return (
     <aside className="order-ticket">
-      <SwitchTab items={productTabs} value={product} onChange={setProduct} className="segmented product-tabs" />
-      {product === "Futures" ? (
-        <EmptyState
-          icon={<Plus />}
-          heading="Demo futures coming soon"
-          description="Explore simulated spot orders in the meantime."
+      <>
+        <SwitchTab
+          items={ticketTabs}
+          value={ticket}
+          onChange={(tab) => {
+            setTicket(tab);
+            setLimit(
+              quote.ready ? (isDemo ? quote.price.toFixed(quote.precision) : String(livePrice ?? "")) : "",
+            );
+          }}
+          className="segmented ticket-tabs"
         />
-      ) : (
-        <>
-          <SwitchTab
-            items={ticketTabs}
-            value={ticket}
-            onChange={(tab) => {
-              setTicket(tab);
-              setLimit(
-                quote.ready ? (isDemo ? quote.price.toFixed(quote.precision) : String(livePrice ?? "")) : "",
-              );
-            }}
-            className="segmented ticket-tabs"
-          />
-          <div className="ticket-content">
-            <h2>{ticket}</h2>
-            {pendingMode && (
-              <label>
-                Limit price
-                <input
-                  aria-label="Limit price"
-                  type="number"
-                  min="0"
-                  step={10 ** -quote.precision}
-                  value={limit}
-                  onChange={(e) => setLimit(e.target.value)}
-                />
-                <small>Buy at or below this price; sell at or above.</small>
-              </label>
-            )}
+        <div className="ticket-content">
+          <h2>{ticket}</h2>
+          {pendingMode && (
             <label>
-              Multiplier
-              <select aria-label="Multiplier" value={leverage} onChange={(e) => setLeverage(+e.target.value)}>
-                {(isDemo ? leverages : multipliers).map((value) => (
-                  <option key={value} value={value}>
-                    {value}×
-                  </option>
-                ))}
-              </select>
+              Limit price
+              <input
+                aria-label="Limit price"
+                type="number"
+                min="0"
+                step={10 ** -quote.precision}
+                value={limit}
+                onChange={(e) => setLimit(e.target.value)}
+              />
+              <small>Buy at or below this price; sell at or above.</small>
             </label>
-            <div className="risk-controls">
-              <label>
-                <span>
-                  Set Loss{" "}
-                  <input
-                    type="checkbox"
-                    role="switch"
-                    checked={stopOn}
-                    onChange={(e) => {
-                      setStopOn(e.target.checked);
-                      if (isDemo ? !stop : e.target.checked) setStop(seed(quote.price * 0.99));
-                    }}
-                  />
-                </span>
-                <input
-                  aria-label="Stop loss price"
-                  type="number"
-                  step="any"
-                  disabled={!stopOn}
-                  value={stop}
-                  placeholder="0"
-                  onChange={(e) => setStop(e.target.value)}
-                />
-              </label>
-              <label>
-                <span>
-                  Take Profit{" "}
-                  <input
-                    type="checkbox"
-                    role="switch"
-                    checked={takeOn}
-                    onChange={(e) => {
-                      setTakeOn(e.target.checked);
-                      if (isDemo ? !take : e.target.checked) setTake(seed(quote.price * 1.01));
-                    }}
-                  />
-                </span>
-                <input
-                  aria-label="Take profit price"
-                  type="number"
-                  step="any"
-                  disabled={!takeOn}
-                  value={take}
-                  placeholder="0"
-                  onChange={(e) => setTake(e.target.value)}
-                />
-              </label>
-            </div>
+          )}
+          <label>
+            Multiplier
+            <select aria-label="Multiplier" value={leverage} onChange={(e) => setLeverage(+e.target.value)}>
+              {(isDemo ? leverages : multipliers).map((value) => (
+                <option key={value} value={value}>
+                  {value}×
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="risk-controls">
             <label>
-              Lots
-              <div className="lot-control">
-                <button
-                  aria-label="Decrease lots"
-                  disabled={lots <= 0.01}
-                  onClick={() => setLotsInput(Math.max(0.01, lots - 0.01).toFixed(2))}
-                >
-                  <Minus size={18} />
-                </button>
+              <span>
+                Set Loss{" "}
                 <input
-                  aria-label="Lots"
-                  type="number"
-                  min="0.01"
-                  max="100"
-                  step="0.01"
-                  value={lotsInput}
-                  onChange={(e) => setLotsInput(e.target.value)}
+                  type="checkbox"
+                  role="switch"
+                  checked={stopOn}
+                  onChange={(e) => {
+                    setStopOn(e.target.checked);
+                    if (isDemo ? !stop : e.target.checked) setStop(seed(quote.price * 0.99));
+                  }}
                 />
-                <button
-                  aria-label="Increase lots"
-                  onClick={() => setLotsInput(Math.min(100, lots + 0.01).toFixed(2))}
-                >
-                  <Plus size={18} />
-                </button>
-              </div>
+              </span>
+              <input
+                aria-label="Stop loss price"
+                type="number"
+                step="any"
+                disabled={!stopOn}
+                value={stop}
+                placeholder="0"
+                onChange={(e) => setStop(e.target.value)}
+              />
             </label>
-            <div className="order-summary">
-              <div>
-                <span>Each Lot</span>
-                <b>{isDemo ? quote.contract.toLocaleString() + " units" : "100 " + quote.symbol}</b>
-              </div>
-              {isDemo || !pendingMode ? (
-                <div>
-                  <span>Estimated Handling Fee</span>
-                  <b className="numeric">{isDemo ? money(fee || 0) : HANDLING_FEE}</b>
-                </div>
-              ) : (
-                <>
-                  <div>
-                    <span>Current Price</span>
-                    <b className="numeric">{livePrice !== null ? livePrice.toFixed(5) : "—"}</b>
-                  </div>
-                  <div>
-                    <span>Trigger at</span>
-                    <b className="numeric">{limit || "0"}</b>
-                  </div>
-                </>
-              )}
-              <div>
-                <span>Estimated Margin</span>
-                <b className={"numeric" + (insufficient ? " negative" : "")}>
-                  {isDemo ? money(margin || 0) : marginText}
-                </b>
-              </div>
-              <div>
-                <span>Balance</span>
-                <b className="numeric">
-                  {balanceLoaded ? (isDemo ? money(balance) : "$" + usdt.toFixed(2)) : "—"}
-                </b>
-              </div>
-            </div>
-            {blocked && (
-              <p role="status" className="ticket-notice">
-                {blocked}
-              </p>
-            )}
-            {insufficient && (
-              <p role="alert" className="negative ticket-notice">
-                ⚠ Insufficient balance. Need {marginText}, you have ${usdt.toFixed(2)}.
-              </p>
-            )}
-            {notice && (
-              <p role="status" className="positive ticket-notice">
-                <CircleCheck size={16} />
-                {notice}
-              </p>
-            )}
-            <small className="simulation-note">
-              {isDemo ? "Live market prices · Virtual funds only" : "Live market prices"}
-            </small>
+            <label>
+              <span>
+                Take Profit{" "}
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={takeOn}
+                  onChange={(e) => {
+                    setTakeOn(e.target.checked);
+                    if (isDemo ? !take : e.target.checked) setTake(seed(quote.price * 1.01));
+                  }}
+                />
+              </span>
+              <input
+                aria-label="Take profit price"
+                type="number"
+                step="any"
+                disabled={!takeOn}
+                value={take}
+                placeholder="0"
+                onChange={(e) => setTake(e.target.value)}
+              />
+            </label>
           </div>
-          <div className="trade-buttons">
-            {(["BUY", "SELL"] as Side[]).map((side) => (
+          <label>
+            Lots
+            <div className="lot-control">
               <button
-                key={side}
-                className={side === "BUY" ? "buy-button" : "sell-button"}
-                disabled={!valid}
-                onClick={() => {
-                  setError("");
-                  setConfirmSide(side);
-                }}
+                aria-label="Decrease lots"
+                disabled={lots <= 0.01}
+                onClick={() => setLotsInput(Math.max(0.01, lots - 0.01).toFixed(2))}
               >
-                {side === "BUY" ? "Buy" : "Sell"}
-                {!isDemo && pendingMode ? " Pending" : ""}
+                <Minus size={18} />
               </button>
-            ))}
+              <input
+                aria-label="Lots"
+                type="number"
+                min="0.01"
+                max="100"
+                step="0.01"
+                value={lotsInput}
+                onChange={(e) => setLotsInput(e.target.value)}
+              />
+              <button
+                aria-label="Increase lots"
+                onClick={() => setLotsInput(Math.min(100, lots + 0.01).toFixed(2))}
+              >
+                <Plus size={18} />
+              </button>
+            </div>
+          </label>
+          <div className="order-summary">
+            <div>
+              <span>Each Lot</span>
+              <b>{isDemo ? quote.contract.toLocaleString() + " units" : "100 " + quote.symbol}</b>
+            </div>
+            {isDemo || !pendingMode ? (
+              <div>
+                <span>Estimated Handling Fee</span>
+                <b className="numeric">{isDemo ? money(fee || 0) : HANDLING_FEE}</b>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <span>Current Price</span>
+                  <b className="numeric">{livePrice !== null ? livePrice.toFixed(5) : "—"}</b>
+                </div>
+                <div>
+                  <span>Trigger at</span>
+                  <b className="numeric">{limit || "0"}</b>
+                </div>
+              </>
+            )}
+            <div>
+              <span>Estimated Margin</span>
+              <b className={"numeric" + (insufficient ? " negative" : "")}>
+                {isDemo ? money(margin || 0) : marginText}
+              </b>
+            </div>
+            <div>
+              <span>Balance</span>
+              <b className="numeric">
+                {balanceLoaded ? (isDemo ? money(balance) : "$" + usdt.toFixed(2)) : "—"}
+              </b>
+            </div>
           </div>
-        </>
-      )}
+          {blocked && (
+            <p role="status" className="ticket-notice">
+              {blocked}
+            </p>
+          )}
+          {insufficient && (
+            <p role="alert" className="negative ticket-notice">
+              ⚠ Insufficient balance. Need {marginText}, you have ${usdt.toFixed(2)}.
+            </p>
+          )}
+          {notice && (
+            <p role="status" className="positive ticket-notice">
+              <CircleCheck size={16} />
+              {notice}
+            </p>
+          )}
+          <small className="simulation-note">
+            {isDemo ? "Live market prices · Virtual funds only" : "Live market prices"}
+          </small>
+        </div>
+        <div className="trade-buttons">
+          {(["BUY", "SELL"] as Side[]).map((side) => (
+            <button
+              key={side}
+              className={side === "BUY" ? "buy-button" : "sell-button"}
+              disabled={!valid}
+              onClick={() => {
+                setError("");
+                setConfirmSide(side);
+              }}
+            >
+              {side === "BUY" ? "Buy" : "Sell"}
+              {!isDemo && pendingMode ? " Pending" : ""}
+            </button>
+          ))}
+        </div>
+      </>
 
       {confirmSide && (
         <Modal

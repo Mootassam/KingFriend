@@ -4,10 +4,11 @@ import { Link } from "react-router-dom";
 import accountSelectors from "src/modules/account/accountSelectors";
 import assetsSelectors from "src/modules/assets/assetsSelectors";
 import authSelectors from "src/modules/auth/authSelectors";
-import demoSelectors, { useDemoStats } from "src/modules/demo/demoSelectors";
+import demoSelectors from "src/modules/demo/demoSelectors";
 import { money } from "src/shared/Amount";
 import AccountActions from "src/view/shared/AccountActions";
 import MoversPanel from "src/view/pages/Home/MoversPanel";
+import useAccountStats from "src/view/pages/Home/useAccountStats";
 
 const greeting = (hour: number) => (hour < 12 ? "Morning" : hour < 17 ? "Afternoon" : "Evening");
 
@@ -19,7 +20,7 @@ export default function HomePage() {
   const balanceLoaded = useSelector(accountSelectors.selectBalanceLoaded);
   const balanceError = useSelector(assetsSelectors.selectErrorMessage);
   const quotes = useSelector(demoSelectors.selectQuotes);
-  const stats = useDemoStats();
+  const stats = useAccountStats();
   const now = new Date();
   // Movers only from instruments the live feed has priced.
   const sorted = quotes.filter((q) => q.ready).sort((a, b) => b.change - a.change);

@@ -2,9 +2,9 @@ import {
   BadgeCheck,
   CalendarDays,
   Copy,
-  FlaskConical,
   Gift,
   Hash,
+  KeyRound,
   Mail,
   Phone,
   RefreshCw,
@@ -27,6 +27,7 @@ import DemoBadge from "src/view/shared/DemoBadge";
 import CinematicLink from "src/view/shared/cinematic/CinematicLink";
 import KycModal from "src/view/shared/kyc/KycModal";
 import Modal from "src/view/shared/modals/Modal";
+import ChangePasswordModal from "src/view/pages/profile/ChangePasswordModal";
 
 const kycLabels = {
   success: "Verified",
@@ -64,6 +65,7 @@ export default function ProfilePage() {
   const [message, setMessage] = useState("");
   const [copied, setCopied] = useState("");
   const [kycOpen, setKycOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   const refresh = () => {
     dispatch(authActions.doRefreshCurrentUser());
@@ -102,7 +104,6 @@ export default function ProfilePage() {
       icon: Gift,
       action: user.refcode ? copyButton("Referral code", user.refcode) : undefined,
     },
-    { label: "ACCOUNT TYPE", value: isDemo ? "Demo" : "Real", icon: FlaskConical },
     {
       label: "KYC STATUS",
       value: isDemo ? "N/A (Demo)" : kycLabels[kycStatus],
@@ -115,6 +116,17 @@ export default function ProfilePage() {
         ) : undefined,
     },
     { label: "MEMBER SINCE", value: memberSince(user.createdAt), icon: CalendarDays },
+    // Demo sign-ins have no password of their own to change.
+    {
+      label: "LOGIN PASSWORD",
+      value: isDemo ? "" : "••••••••",
+      icon: KeyRound,
+      action: (
+        <button className="link-button" onClick={() => setPasswordOpen(true)}>
+          Change
+        </button>
+      ),
+    },
   ].filter((row) => row.value);
 
   // Empty wallets add nothing but noise; frozen-only wallets still count as holdings.
@@ -220,6 +232,7 @@ export default function ProfilePage() {
       </div>
 
       {kycOpen && <KycModal onClose={() => setKycOpen(false)} />}
+      {passwordOpen && <ChangePasswordModal onClose={() => setPasswordOpen(false)} />}
 
       {message && (
         <Modal title="Account" onClose={() => setMessage("")}>

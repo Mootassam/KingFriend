@@ -75,6 +75,12 @@ export default class AuthService {
     return response.data;
   }
 
+  // Login password, same endpoint as PC's /loginpassword page.
+  static async changePassword(oldPassword: string, newPassword: string) {
+    const response = await authAxios.put("/auth/change-password", { oldPassword, newPassword });
+    return response.data;
+  }
+
   // oldPassword is required by the server once a withdraw password exists.
   static async changeWithdrawPassword(oldPassword: string | undefined, newPassword: string) {
     const tenantId = AuthCurrentTenant.get();
